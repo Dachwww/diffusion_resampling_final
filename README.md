@@ -1,3 +1,6 @@
+# This is final project for the class--"Multimodal learning". Some modifications will be implemented.
+
+
 # Correcting Diffusion Generation through Resampling
 
 This is the official impelmenation of the paper [Correcting Diffusion Generation through Resampling](https://arxiv.org/abs/2312.06038).
