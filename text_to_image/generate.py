@@ -8,10 +8,11 @@ import torch
 from transformers import set_seed
 from tqdm import tqdm
 
-from utils import get_np_indices, load_spacy_stopwords, load_diffusion_model, load_discriminator
+from utils import get_np_indices, load_spacy_stopwords, load_discriminator,load_diffusion_model
 from resampling import calculate_weights, resample
 import discriminator_lib
 
+# from diffusers import StableDiffusionPipeline
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -67,6 +68,21 @@ def parse_args():
     return args
 
 
+# def load_diffusion_model_from_local(model_path):
+#     """
+#     从本地加载 Stable Diffusion 模型
+#     :param model_path: 模型的本地路径
+#     :return: StableDiffusionPipeline 对象
+#     """
+#     try:
+#         # 加载本地的 Stable Diffusion 模型
+#         pipe = StableDiffusionPipeline.from_pretrained(model_path)
+#         print(f"Successfully loaded the diffusion model from {model_path}.")
+#         return pipe
+#     except Exception as e:
+#         print(f"Error loading the diffusion model from {model_path}: {e}")
+#         raise
+
 def main():
     args = parse_args()
     
@@ -104,8 +120,11 @@ def main():
             restart_list = json.loads(restart_list.strip())
     
     # Diffusion model
+    # model_path = args.diffusion_model_id  # 获取模型路径，确保是字符串类型
+    print("Starting to load the diffusion model...")
     pipe = load_diffusion_model(args)
-    
+    print("Diffusion model loaded successfully.")
+    pipe.to(args.device) 
     # Denoise time steps
     step_indices = torch.arange(args.num_step+1, dtype=torch.float32, device=args.device)
     sigma_steps = (pipe.scheduler.init_noise_sigma ** (1 / args.rho) + step_indices / args.num_step * \
@@ -149,6 +168,10 @@ def main():
             # Get object indices in MS-COCO
             _, _, coco_indices = get_np_indices(text_desc, nlp, stopwords_list)
             coco_indices = torch.tensor(coco_indices, device=args.device)
+            # print(f"text_desc: {text_desc}")
+            # print(f"args.device: {args.device}")
+            # print(f"Model device: {pipe.device}")
+            # print(f"text_desc device: {text_desc.device}")
             # Encode input prompt
             prompt_embeds = pipe._encode_prompt(
                 text_desc,
@@ -208,8 +231,8 @@ def main():
                 for sample_ind in range(0, num_samples, args.batch_size):
                     tmp_xt_next, _ = pipe.scheduler.step(
                         xt[sample_ind: sample_ind + args.batch_size],
-                        sigma_cur,
                         sigma_next,
+                        sigma_cur,
                         prompt_embeds,
                         second_order=args.sampler=='edm'
                     )
@@ -263,7 +286,7 @@ def main():
                                 xt_next.append(tmp_xt_next)
                             
                             xt = torch.vstack(xt_next)
-            
+            print("start saving images......")
             # save image
             for sample_ind in range(num_samples):
                 final_img = pipe.decode_latents(xt[[sample_ind]])
